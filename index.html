@@ -1965,6 +1965,7 @@ function renderAuth() {
         Sign in with Google
       </button>
       <p class="auth-error" id="authError"></p>
+      <p class="auth-loading" id="authLoading" style="display: none;">Signing in...</p>
     </div>
   `;
 }
@@ -1972,13 +1973,37 @@ function renderAuth() {
 function attachAuthEvents() {
   document.getElementById('googleSignIn').addEventListener('click', async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
+    const btn = document.getElementById('googleSignIn');
+    const loading = document.getElementById('authLoading');
+    
     try {
-      await auth.signInWithPopup(provider);
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      loading.style.display = 'block';
+      
+      // Use redirect instead of popup (more reliable, no popup blocker issues)
+      await auth.signInWithRedirect(provider);
     } catch (error) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      loading.style.display = 'none';
       document.getElementById('authError').textContent = error.message;
     }
   });
 }
+
+// Handle redirect result when page loads
+auth.getRedirectResult().then((result) => {
+  if (result.user) {
+    console.log('Signed in via redirect');
+  }
+}).catch((error) => {
+  console.error('Redirect sign-in error:', error);
+  const errorEl = document.getElementById('authError');
+  if (errorEl) {
+    errorEl.textContent = error.message;
+  }
+});
 
 // Auth state listener
 auth.onAuthStateChanged(async (user) => {
