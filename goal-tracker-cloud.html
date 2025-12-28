@@ -1,0 +1,3119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Goal Tracker</title>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #F5F3EF;
+      min-height: 100vh;
+      color: #2C2C2C;
+      line-height: 1.5;
+    }
+    
+    /* Auth Screen */
+    .auth-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .auth-logo {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    
+    .auth-title {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .auth-subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 32px;
+    }
+    
+    .auth-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 28px;
+      background: #FEFEFE;
+      border: 1px solid #D4D0C8;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .auth-btn:hover {
+      background: #F8F7F5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .auth-btn img {
+      width: 20px;
+      height: 20px;
+    }
+    
+    .auth-error {
+      color: #DC2626;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+    
+    .auth-loading {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    /* Sync Status */
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #888;
+      padding: 4px 10px;
+      background: #F0EDE8;
+      border-radius: 12px;
+    }
+    
+    .sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22C55E;
+    }
+    
+    .sync-dot.syncing {
+      background: #F59E0B;
+      animation: pulse 1s infinite;
+    }
+    
+    .sync-dot.offline {
+      background: #999;
+    }
+    
+    .sync-dot.error {
+      background: #DC2626;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* User Menu */
+    .user-menu {
+      position: relative;
+    }
+    
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid #E5E2DC;
+    }
+    
+    .user-dropdown {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      background: #FEFEFE;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 180px;
+      display: none;
+      z-index: 100;
+    }
+    
+    .user-dropdown.show {
+      display: block;
+    }
+    
+    .user-dropdown-item {
+      padding: 12px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      border-bottom: 1px solid #F0EDE8;
+    }
+    
+    .user-dropdown-item:last-child {
+      border-bottom: none;
+    }
+    
+    .user-dropdown-item:hover {
+      background: #F8F7F5;
+    }
+    
+    .user-dropdown-item.danger {
+      color: #DC2626;
+    }
+    
+    .user-email {
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #888;
+      border-bottom: 1px solid #E5E2DC;
+      word-break: break-all;
+    }
+    
+    .header {
+      padding: 16px 20px;
+      background: #FEFEFE;
+      border-bottom: 1px solid #E5E2DC;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      flex: 1;
+    }
+    
+    .current-month {
+      font-size: 13px;
+      color: #666;
+      background: #F0EDE8;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    
+    .back-btn {
+      background: none;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
+      color: #555;
+      padding: 8px 0;
+    }
+    
+    .container {
+      padding: 16px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    /* Save Toast */
+    .save-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #2D5A4A;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 1000;
+      opacity: 0;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .save-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    
+    /* Backup Reminder Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    
+    .modal-overlay.hidden {
+      display: none;
+    }
+    
+    .modal {
+      background: #FEFEFE;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+    }
+    
+    .modal-icon {
+      font-size: 40px;
+      margin-bottom: 16px;
+    }
+    
+    .modal h2 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    
+    .modal p {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+    
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .modal-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .modal-btn.primary {
+      background: #2D5A4A;
+      color: white;
+    }
+    
+    .modal-btn.secondary {
+      background: #F0EDE8;
+      color: #555;
+    }
+    
+    /* Date Banner */
+    .date-banner {
+      background: linear-gradient(135deg, #2D5A4A 0%, #1E3D32 100%);
+      color: white;
+      padding: 20px;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .date-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .date-weekday {
+      font-size: 13px;
+      opacity: 0.85;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    
+    .date-full {
+      font-size: 22px;
+      font-weight: 600;
+    }
+    
+    .session-info {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    
+    .session-label {
+      font-size: 10px;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    
+    .session-time {
+      font-size: 18px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    /* Session timer flash */
+    .session-time.flash {
+      animation: timerFlash 0.5s ease-in-out 10;
+    }
+    
+    @keyframes timerFlash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    /* Week Navigation */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    
+    .week-nav-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #D4D0C8;
+      border-radius: 6px;
+      background: #FEFEFE;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .week-nav-btn:hover {
+      background: #F0EDE8;
+    }
+    
+    .week-nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    
+    .week-nav-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      text-align: center;
+    }
+    
+    .week-nav-sublabel {
+      font-size: 11px;
+      color: #888;
+      text-align: center;
+      margin-top: 2px;
+    }
+    
+    .viewing-past-week {
+      background: #FEF3E2;
+      border-color: #F59E0B;
+    }
+
+    /* Focus Area Cards */
+    .area-card {
+      background: #FEFEFE;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      border-left: 4px solid var(--accent);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .area-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    
+    .area-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .area-icon {
+      font-size: 18px;
+    }
+    
+    .area-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .goal-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-top: 1px solid #F0EDE8;
+    }
+    
+    .goal-row:first-of-type {
+      border-top: none;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    
+    .status-dot.green { background: #22C55E; }
+    .status-dot.amber { background: #F59E0B; }
+    .status-dot.red { background: #DC2626; }
+    .status-dot.empty { background: #D4D0C8; }
+    
+    .goal-text {
+      flex: 1;
+      font-size: 14px;
+      color: #333;
+    }
+    
+    .goal-text.empty {
+      color: #AAA;
+      font-style: italic;
+    }
+    
+    .task-progress {
+      font-size: 11px;
+      color: #888;
+    }
+    
+    /* Exercise Quick Tracker */
+    .exercise-quick {
+      background: #FEFEFE;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border-left: 4px solid #6B3B3B;
+    }
+    
+    .exercise-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .exercise-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    
+    .exercise-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .exercise-label {
+      font-size: 13px;
+      width: 65px;
+      color: #555;
+    }
+    
+    .strength-checks {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .check-btn {
+      width: 30px;
+      height: 30px;
+      border: 2px solid #D4D0C8;
+      border-radius: 6px;
+      background: #FEFEFE;
+      cursor: pointer;
+      font-size: 14px;
+      color: #6B3B3B;
+      transition: all 0.15s;
+    }
+    
+    .check-btn.checked {
+      background: #6B3B3B;
+      border-color: #6B3B3B;
+      color: white;
+    }
+    
+    .exercise-count {
+      font-size: 13px;
+      color: #888;
+      margin-left: auto;
+    }
+    
+    .zone2-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .zone2-controls button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #D4D0C8;
+      border-radius: 6px;
+      background: #FEFEFE;
+      cursor: pointer;
+      font-size: 16px;
+      color: #666;
+    }
+    
+    .zone2-value {
+      font-size: 13px;
+      min-width: 55px;
+      text-align: center;
+    }
+    
+    .zone2-bar {
+      flex: 1;
+      height: 6px;
+      background: #E5E2DC;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-left: 8px;
+    }
+    
+    .zone2-fill {
+      height: 100%;
+      background: #6B3B3B;
+      transition: width 0.3s;
+    }
+    
+    .meditation-fill {
+      height: 100%;
+      background: #4A3B6B;
+      transition: width 0.3s;
+    }
+    
+    .nudge-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #F0EDE8;
+    }
+    
+    .nudge-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: #FEF3E2;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: #92400E;
+    }
+    
+    .nudge-item.close {
+      background: #E0F2FE;
+      color: #0369A1;
+    }
+    
+    .nudge-item.achieved {
+      background: #DCFCE7;
+      color: #166534;
+    }
+    
+    .nudge-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .nudge-icon {
+      font-size: 14px;
+    }
+    
+    /* Last Week Summary */
+    .last-week-summary {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #F0EDE8;
+    }
+    
+    .last-week-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .last-week-stats {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .last-week-stat {
+      flex: 1;
+      background: #F8F7F5;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .stat-value.hit {
+      color: #22C55E;
+    }
+    
+    .stat-value.missed {
+      color: #DC2626;
+    }
+    
+    .stat-label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 2px;
+    }
+    
+    .last-week-verdict {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: center;
+    }
+    
+    .last-week-verdict.great {
+      background: #DCFCE7;
+      color: #166534;
+    }
+    
+    .last-week-verdict.good {
+      background: #E0F2FE;
+      color: #0369A1;
+    }
+    
+    .last-week-verdict.needs-work {
+      background: #FEF3E2;
+      color: #92400E;
+    }
+    
+    /* Learnings Section in Weekly View */
+    .learnings-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #E5E2DC;
+    }
+    
+    .learnings-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+    
+    .learnings-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .learnings-count {
+      font-size: 10px;
+      background: #F0EDE8;
+      color: #666;
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+    
+    .learning-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 12px;
+      color: #555;
+    }
+    
+    .learning-bullet {
+      color: #999;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    
+    .learning-text {
+      flex: 1;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+    
+    .learning-text:hover {
+      background: #F8F7F5;
+      border-radius: 4px;
+    }
+    
+    .learning-delete {
+      width: 18px;
+      height: 18px;
+      border: none;
+      background: none;
+      color: #CCC;
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    
+    .learning-item:hover .learning-delete {
+      opacity: 1;
+    }
+    
+    .learning-edit-input {
+      flex: 1;
+      font-size: 12px;
+      padding: 4px 8px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      outline: none;
+    }
+    
+    .add-learning-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    
+    .add-learning-input {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid #E5E2DC;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+    }
+    
+    .add-learning-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: #888;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    /* Learnings View */
+    .learnings-view-btn {
+      width: 100%;
+      padding: 12px;
+      background: #FEFEFE;
+      border: 1px solid #D4D0C8;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #666;
+      margin-top: 8px;
+    }
+    
+    .learnings-month-group {
+      background: #FEFEFE;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    
+    .learnings-month-header {
+      padding: 12px 16px;
+      background: #F8F7F5;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #E5E2DC;
+    }
+    
+    .learnings-month-header:hover {
+      background: #F0EDE8;
+    }
+    
+    .learnings-month-arrow {
+      color: #999;
+      font-size: 12px;
+    }
+    
+    .learnings-goal-group {
+      padding: 12px 16px;
+      border-bottom: 1px solid #F0EDE8;
+    }
+    
+    .learnings-goal-group:last-child {
+      border-bottom: none;
+    }
+    
+    .learnings-goal-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .learnings-goal-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .learnings-week-group {
+      margin-left: 16px;
+      margin-bottom: 10px;
+    }
+    
+    .learnings-week-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .learnings-week-label {
+      font-size: 10px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    
+    .learnings-week-item {
+      font-size: 12px;
+      color: #555;
+      padding: 3px 0;
+      padding-left: 12px;
+      position: relative;
+      line-height: 1.4;
+    }
+    
+    .learnings-week-item::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: #999;
+    }
+    
+    .no-learnings {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+      font-size: 14px;
+    }
+    
+    /* Month Review View */
+    .month-review-area {
+      background: #FEFEFE;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      border-left: 4px solid var(--accent);
+      overflow: hidden;
+    }
+    
+    .month-review-header {
+      padding: 14px 16px;
+      background: #F8F7F5;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #E5E2DC;
+    }
+    
+    .month-review-header .area-icon {
+      font-size: 18px;
+    }
+    
+    .month-review-header .area-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .month-review-goal {
+      padding: 14px 16px;
+      border-bottom: 1px solid #F0EDE8;
+    }
+    
+    .month-review-goal:last-child {
+      border-bottom: none;
+    }
+    
+    .month-review-goal-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    
+    .month-review-goal-title.empty {
+      color: #AAA;
+      font-style: italic;
+    }
+    
+    .month-review-week {
+      margin-left: 12px;
+      margin-bottom: 12px;
+      padding-left: 12px;
+      border-left: 2px solid #E5E2DC;
+    }
+    
+    .month-review-week:last-child {
+      margin-bottom: 0;
+    }
+    
+    .month-review-week-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    
+    .month-review-task {
+      font-size: 12px;
+      color: #666;
+      padding: 3px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .month-review-task.done {
+      color: #999;
+      text-decoration: line-through;
+    }
+    
+    .month-review-task-check {
+      width: 14px;
+      height: 14px;
+      border: 1px solid #D4D0C8;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #888;
+      flex-shrink: 0;
+    }
+    
+    .month-review-task.done .month-review-task-check {
+      background: #22C55E;
+      border-color: #22C55E;
+      color: white;
+    }
+    
+    .month-review-no-tasks {
+      font-size: 12px;
+      color: #BBB;
+      font-style: italic;
+      padding: 4px 0;
+    }
+    
+    .yearly-btn {
+      width: 100%;
+      padding: 12px;
+      background: #FEFEFE;
+      border: 1px solid #D4D0C8;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #666;
+      margin-top: 8px;
+    }
+    
+    /* Monthly View */
+    .monthly-goal-section {
+      background: #FEFEFE;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border-left: 4px solid var(--accent);
+    }
+    
+    .goal-number {
+      font-size: 10px;
+      font-weight: 600;
+      color: #AAA;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .goal-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .goal-input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #E5E2DC;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    
+    .goal-input:focus {
+      border-color: var(--accent);
+    }
+    
+    .week-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #F0EDE8;
+    }
+    
+    .week-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .week-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+    }
+    
+    .current-badge {
+      font-size: 9px;
+      background: var(--accent);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 8px;
+      text-transform: uppercase;
+    }
+    
+    .week-status {
+      margin-left: auto;
+      font-size: 11px;
+      color: #888;
+    }
+    
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+    }
+    
+    .task-check {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #D4D0C8;
+      border-radius: 5px;
+      background: #FEFEFE;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--accent);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .task-check.done {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    
+    .task-text {
+      flex: 1;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    
+    .task-text:hover {
+      background: #F8F7F5;
+      border-radius: 4px;
+    }
+    
+    .task-text.done {
+      text-decoration: line-through;
+      color: #999;
+    }
+    
+    .task-edit-input {
+      flex: 1;
+      font-size: 13px;
+      padding: 4px 8px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      outline: none;
+    }
+    
+    .task-delete {
+      width: 22px;
+      height: 22px;
+      border: none;
+      background: none;
+      color: #CCC;
+      cursor: pointer;
+      font-size: 16px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    
+    .task-item:hover .task-delete {
+      opacity: 1;
+    }
+    
+    .add-task-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    
+    .add-task-input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #E5E2DC;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+    
+    .add-task-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    
+    .add-task-btn:disabled {
+      background: #D4D0C8;
+      cursor: not-allowed;
+    }
+    
+    .max-tasks-note {
+      font-size: 11px;
+      color: #AAA;
+      margin-top: 4px;
+    }
+    
+    /* Yearly View */
+    .yearly-grid {
+      background: #FEFEFE;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    
+    .grid-header {
+      display: flex;
+      padding: 10px 12px;
+      background: #F8F7F5;
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      border-bottom: 1px solid #E5E2DC;
+    }
+    
+    .month-col {
+      width: 50px;
+    }
+    
+    .area-col {
+      flex: 1;
+      text-align: center;
+      font-size: 14px;
+    }
+    
+    .grid-row {
+      display: flex;
+      padding: 10px 12px;
+      border-bottom: 1px solid #F0EDE8;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    
+    .grid-row:hover {
+      background: #F8F7F5;
+    }
+    
+    .grid-row:hover::after {
+      content: 'Click to review →';
+      font-size: 10px;
+      color: #888;
+      margin-left: auto;
+      padding-left: 8px;
+    }
+    
+    .grid-row.current {
+      background: #F0F7F4;
+    }
+    
+    .grid-row:last-child {
+      border-bottom: none;
+    }
+    
+    .status-cell {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+    }
+    
+    .mini-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .mini-dot.green { background: #22C55E; }
+    .mini-dot.amber { background: #F59E0B; }
+    .mini-dot.red { background: #DC2626; }
+    .mini-dot.empty { background: #E5E2DC; }
+    
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      font-size: 11px;
+      color: #888;
+      flex-wrap: wrap;
+    }
+    
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .legend .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    /* Settings/Backup Section */
+    .settings-section {
+      background: #FEFEFE;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    
+    .settings-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .settings-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .settings-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .settings-btn {
+      flex: 1;
+      padding: 10px 12px;
+      background: #F8F7F5;
+      border: 1px solid #E5E2DC;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    
+    .settings-btn:hover {
+      background: #F0EDE8;
+    }
+    
+    .settings-btn.danger {
+      color: #DC2626;
+      border-color: #FEE2E2;
+    }
+    
+    .settings-btn.danger:hover {
+      background: #FEF2F2;
+    }
+    
+    .last-backup {
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+      margin-top: 8px;
+    }
+    
+    /* Hidden file input */
+    #importInput {
+      display: none;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<!-- Save Toast -->
+<div class="save-toast" id="saveToast">
+  <span>✓</span> Synced
+</div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="importInput" accept=".json">
+
+<script>
+// =====================================================
+// FIREBASE CONFIGURATION
+// Replace these values with your own from Firebase Console
+// =====================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBi_KYn1cstr5Dap1RcoIq2KUGtj3vz5U0",
+  authDomain: "goal-tracker-b9258.firebaseapp.com",
+  databaseURL: "https://goal-tracker-b9258-default-rtdb.firebaseio.com",
+  projectId: "goal-tracker-b9258",
+  storageBucket: "goal-tracker-b9258.firebasestorage.app",
+  messagingSenderId: "935912274332",
+  appId: "1:935912274332:web:a539e24e90f39a9a6f7059"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
+
+// =====================================================
+// DATA MANAGEMENT
+// =====================================================
+const STORAGE_KEY = 'goalTrackerDataV2';
+const BACKUP_KEY = 'lastBackupDate';
+
+let currentUser = null;
+let userDataRef = null;
+let syncStatus = 'offline'; // 'synced', 'syncing', 'offline', 'error'
+let isOnline = navigator.onLine;
+
+// Listen for online/offline
+window.addEventListener('online', () => { isOnline = true; syncToCloud(); });
+window.addEventListener('offline', () => { isOnline = false; updateSyncStatus('offline'); });
+
+const FOCUS_AREAS = {
+  finance: { name: 'Finance', icon: '📊', color: '#2D5A4A' },
+  son: { name: "Son's Development", icon: '🌱', color: '#8B6914' },
+  career: { name: 'Career', icon: '🎯', color: '#4A3B6B' },
+  exercise: { name: 'Exercise', icon: '💪', color: '#6B3B3B' },
+  life: { name: 'Life Maintenance', icon: '🏠', color: '#1E6091' }
+};
+
+// Session Timer
+let sessionStartTime = Date.now();
+let sessionTimerInterval = null;
+let lastFlashMinute = 0;
+
+// Week Navigation
+let viewingWeekOffset = 0;
+
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getWeekKey(offset = 0) {
+  const now = new Date();
+  const monday = getMonday(now);
+  monday.setDate(monday.getDate() + (offset * 7));
+  return monday.toISOString().slice(0, 10);
+}
+
+function getWeekLabel(offset) {
+  const monday = getMonday(new Date());
+  monday.setDate(monday.getDate() + (offset * 7));
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  
+  const monthDay = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dateRange = `${monthDay(monday)} - ${monthDay(sunday)}`;
+  
+  if (offset === 0) return `This Week (${dateRange})`;
+  if (offset === -1) return `Last Week (${dateRange})`;
+  return dateRange;
+}
+
+function isCurrentWeek(offset) {
+  return offset === 0;
+}
+
+function formatSessionTime(ms) {
+  const totalMinutes = Math.floor(ms / 60000);
+  return `${totalMinutes} min`;
+}
+
+function updateSessionTimer() {
+  const elapsed = Date.now() - sessionStartTime;
+  const totalMinutes = Math.floor(elapsed / 60000);
+  const timerEls = document.querySelectorAll('.session-time');
+  
+  timerEls.forEach(el => {
+    el.textContent = formatSessionTime(elapsed);
+    
+    if (totalMinutes > 0 && totalMinutes % 10 === 0 && totalMinutes !== lastFlashMinute) {
+      lastFlashMinute = totalMinutes;
+      el.classList.add('flash');
+      setTimeout(() => {
+        el.classList.remove('flash');
+      }, 5000);
+    }
+  });
+}
+
+function startSessionTimer() {
+  if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+  updateSessionTimer();
+  sessionTimerInterval = setInterval(updateSessionTimer, 10000);
+}
+
+function getInitialData() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      
+      if (!data.areas.life) {
+        data.areas.life = { months: {} };
+      }
+      
+      if (!data.exerciseByWeek) {
+        data.exerciseByWeek = {};
+        
+        if (data.weeklyExercise) {
+          const currentWeekKey = getWeekKey(0);
+          data.exerciseByWeek[currentWeekKey] = {
+            strength: data.weeklyExercise.strength || [false, false, false],
+            zone2Mins: data.weeklyExercise.zone2Mins || 0,
+            meditationMins: data.weeklyExercise.meditationMins || 0
+          };
+          delete data.weeklyExercise;
+        }
+        
+        if (data.lastWeekExercise) {
+          const lastWeekKey = getWeekKey(-1);
+          const strengthCount = typeof data.lastWeekExercise.strength === 'number' 
+            ? data.lastWeekExercise.strength 
+            : (data.lastWeekExercise.strength || []).filter(Boolean).length;
+          data.exerciseByWeek[lastWeekKey] = {
+            strength: Array(strengthCount).fill(true).concat(Array(3 - strengthCount).fill(false)),
+            zone2Mins: data.lastWeekExercise.zone2Mins || 0,
+            meditationMins: data.lastWeekExercise.meditationMins || 0
+          };
+          delete data.lastWeekExercise;
+        }
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      }
+      
+      return data;
+    } catch(e) {
+      console.error('Failed to parse stored data:', e);
+    }
+  }
+  
+  return createEmptyData();
+}
+
+function createEmptyData() {
+  return {
+    currentMonth: getCurrentMonth(),
+    areas: {
+      finance: { months: {} },
+      son: { months: {} },
+      career: { months: {} },
+      exercise: { months: {} },
+      life: { months: {} }
+    },
+    exerciseByWeek: {}
+  };
+}
+
+function getExerciseForWeek(weekKey) {
+  if (!appData.exerciseByWeek) {
+    appData.exerciseByWeek = {};
+  }
+  if (!appData.exerciseByWeek[weekKey]) {
+    appData.exerciseByWeek[weekKey] = {
+      strength: [false, false, false],
+      zone2Mins: 0,
+      meditationMins: 0
+    };
+  }
+  return appData.exerciseByWeek[weekKey];
+}
+
+function getLastWeekExercise() {
+  const lastWeekKey = getWeekKey(-1);
+  if (!appData.exerciseByWeek) return null;
+  return appData.exerciseByWeek[lastWeekKey] || null;
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  syncToCloud();
+  showSaveToast();
+}
+
+async function syncToCloud() {
+  if (!currentUser || !userDataRef) return;
+  if (!isOnline) {
+    updateSyncStatus('offline');
+    return;
+  }
+  
+  updateSyncStatus('syncing');
+  
+  try {
+    await userDataRef.set(appData);
+    updateSyncStatus('synced');
+  } catch (error) {
+    console.error('Sync error:', error);
+    updateSyncStatus('error');
+  }
+}
+
+function updateSyncStatus(status) {
+  syncStatus = status;
+  const statusEl = document.querySelector('.sync-status');
+  if (statusEl) {
+    const dot = statusEl.querySelector('.sync-dot');
+    const text = statusEl.querySelector('.sync-text');
+    
+    dot.className = 'sync-dot';
+    if (status === 'syncing') {
+      dot.classList.add('syncing');
+      text.textContent = 'Syncing...';
+    } else if (status === 'synced') {
+      text.textContent = 'Synced';
+    } else if (status === 'offline') {
+      dot.classList.add('offline');
+      text.textContent = 'Offline';
+    } else if (status === 'error') {
+      dot.classList.add('error');
+      text.textContent = 'Sync error';
+    }
+  }
+}
+
+function showSaveToast() {
+  const toast = document.getElementById('saveToast');
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 1500);
+}
+
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function getMonthName(monthStr) {
+  const [year, month] = monthStr.split('-');
+  return new Date(year, parseInt(month) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function getShortMonthName(monthStr) {
+  const [year, month] = monthStr.split('-');
+  return new Date(year, parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short' });
+}
+
+function getCurrentWeekNumber() {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstMonday = getMonday(firstOfMonth);
+  if (firstMonday.getMonth() !== now.getMonth() && firstMonday < firstOfMonth) {
+    firstMonday.setDate(firstMonday.getDate() + 7);
+  }
+  const currentMonday = getMonday(now);
+  const weekNum = Math.floor((currentMonday - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return Math.max(1, Math.min(5, weekNum));
+}
+
+function getTodayFormatted() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function getWeekdayName() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+function getFullDate() {
+  return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function getDayOfWeek() {
+  const day = new Date().getDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+function getGoalStatus(goalData) {
+  if (!goalData || !goalData.text) return 'empty';
+  
+  const weeks = goalData.weeks || [];
+  let totalTasks = 0;
+  let completedTasks = 0;
+  
+  weeks.forEach(week => {
+    (week.tasks || []).forEach(task => {
+      totalTasks++;
+      if (task.done) completedTasks++;
+    });
+  });
+  
+  if (totalTasks === 0) return 'empty';
+  if (completedTasks === totalTasks) return 'green';
+  if (completedTasks > 0) return 'amber';
+  return 'red';
+}
+
+function getTaskCount(goalData) {
+  if (!goalData) return { done: 0, total: 0 };
+  const weeks = goalData.weeks || [];
+  let total = 0, done = 0;
+  weeks.forEach(week => {
+    (week.tasks || []).forEach(task => {
+      total++;
+      if (task.done) done++;
+    });
+  });
+  return { done, total };
+}
+
+function getNudges(exercise) {
+  const nudges = [];
+  const dayOfWeek = getDayOfWeek();
+  const strengthCount = exercise.strength.filter(Boolean).length;
+  
+  if (strengthCount === 3) {
+    nudges.push({ icon: '🏆', text: "All 3 strength sessions done! You're crushing it!", type: 'achieved' });
+  } else if (strengthCount === 2) {
+    nudges.push({ icon: '🔥', text: "2 down, 1 to go - finish strong this week!", type: 'close' });
+  } else if (strengthCount === 1 && dayOfWeek >= 1) {
+    nudges.push({ icon: '💪', text: "1 workout in - keep the momentum going!", type: 'close' });
+  } else if (dayOfWeek >= 1 && strengthCount === 0) {
+    nudges.push({ icon: '🏋️', text: "No strength workout yet this week - time to move!", type: 'warning' });
+  }
+  
+  if (exercise.zone2Mins >= 30) {
+    const extra = exercise.zone2Mins - 30;
+    if (extra > 0) {
+      nudges.push({ icon: '🫀', text: `Zone 2 complete + ${extra} bonus mins! Heart health hero!`, type: 'achieved' });
+    } else {
+      nudges.push({ icon: '🫀', text: "30 mins Zone 2 done! Your heart thanks you!", type: 'achieved' });
+    }
+  } else if (exercise.zone2Mins >= 20) {
+    nudges.push({ icon: '💨', text: `${30 - exercise.zone2Mins} mins to Zone 2 goal - almost there!`, type: 'close' });
+  } else if (exercise.zone2Mins >= 10) {
+    nudges.push({ icon: '👟', text: `${exercise.zone2Mins} mins logged - building that cardio base!`, type: 'close' });
+  } else if (dayOfWeek >= 2 && exercise.zone2Mins < 10) {
+    nudges.push({ icon: '🫀', text: "Zone 2 cardio is behind - get that heart pumping!", type: 'warning' });
+  }
+  
+  if (exercise.meditationMins >= 20) {
+    const extra = exercise.meditationMins - 20;
+    if (extra > 0) {
+      nudges.push({ icon: '🧘', text: `${exercise.meditationMins} mins of calm! +${extra} mins bonus zen!`, type: 'achieved' });
+    } else {
+      nudges.push({ icon: '🧘', text: "20 mins meditation reached! Mind at peace!", type: 'achieved' });
+    }
+  } else if (exercise.meditationMins >= 15) {
+    nudges.push({ icon: '✨', text: `${20 - exercise.meditationMins} mins to meditation goal - so close!`, type: 'close' });
+  } else if (exercise.meditationMins >= 5) {
+    nudges.push({ icon: '🌱', text: `${exercise.meditationMins} mins of mindfulness - growing your practice!`, type: 'close' });
+  } else if (dayOfWeek >= 1 && exercise.meditationMins < 5) {
+    nudges.push({ icon: '🧘', text: "Haven't meditated yet - 5 mins makes a difference!", type: 'warning' });
+  }
+  
+  return nudges;
+}
+
+function renderLastWeekSummary(lastWeek) {
+  if (!lastWeek) return '';
+  
+  const strengthCount = lastWeek.strength ? lastWeek.strength.filter(Boolean).length : 0;
+  const zone2 = lastWeek.zone2Mins || 0;
+  const meditation = lastWeek.meditationMins || 0;
+  
+  if (strengthCount === 0 && zone2 === 0 && meditation === 0) {
+    return '';
+  }
+  
+  const strengthHit = strengthCount >= 3;
+  const zone2Hit = zone2 >= 30;
+  const meditationHit = meditation >= 20;
+  const goalsHit = [strengthHit, zone2Hit, meditationHit].filter(Boolean).length;
+  
+  let verdictClass, verdictText;
+  if (goalsHit === 3) {
+    verdictClass = 'great';
+    verdictText = '🌟 Perfect week! All goals crushed!';
+  } else if (goalsHit === 2) {
+    verdictClass = 'good';
+    verdictText = '👍 Solid week! 2 out of 3 goals hit.';
+  } else if (goalsHit === 1) {
+    verdictClass = 'needs-work';
+    verdictText = '💪 1 goal down. Keep building!';
+  } else {
+    verdictClass = 'needs-work';
+    verdictText = '📈 Room to grow. You\'ve got this!';
+  }
+  
+  return `
+    <div class="last-week-summary">
+      <div class="last-week-title">Last Week</div>
+      <div class="last-week-stats">
+        <div class="last-week-stat">
+          <div class="stat-value ${strengthHit ? 'hit' : 'missed'}">${strengthCount}/3</div>
+          <div class="stat-label">Strength</div>
+        </div>
+        <div class="last-week-stat">
+          <div class="stat-value ${zone2Hit ? 'hit' : 'missed'}">${zone2}</div>
+          <div class="stat-label">Zone 2 min</div>
+        </div>
+        <div class="last-week-stat">
+          <div class="stat-value ${meditationHit ? 'hit' : 'missed'}">${meditation}</div>
+          <div class="stat-label">Meditate min</div>
+        </div>
+      </div>
+      <div class="last-week-verdict ${verdictClass}">${verdictText}</div>
+    </div>
+  `;
+}
+
+function exportData() {
+  const data = localStorage.getItem(STORAGE_KEY);
+  if (!data) {
+    alert('No data to export');
+    return;
+  }
+  
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `goal-tracker-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+  render();
+  showSaveToast();
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.areas && data.currentMonth) {
+        
+        if (!data.areas.life) {
+          data.areas.life = { months: {} };
+        }
+        
+        if (!data.exerciseByWeek) {
+          data.exerciseByWeek = {};
+          
+          if (data.weeklyExercise) {
+            const currentWeekKey = getWeekKey(0);
+            data.exerciseByWeek[currentWeekKey] = {
+              strength: data.weeklyExercise.strength || [false, false, false],
+              zone2Mins: data.weeklyExercise.zone2Mins || 0,
+              meditationMins: data.weeklyExercise.meditationMins || 0
+            };
+            delete data.weeklyExercise;
+          }
+          
+          if (data.lastWeekExercise) {
+            const lastWeekKey = getWeekKey(-1);
+            const strengthCount = data.lastWeekExercise.strength || 0;
+            data.exerciseByWeek[lastWeekKey] = {
+              strength: Array(strengthCount).fill(true).concat(Array(3 - strengthCount).fill(false)),
+              zone2Mins: data.lastWeekExercise.zone2Mins || 0,
+              meditationMins: data.lastWeekExercise.meditationMins || 0
+            };
+            delete data.lastWeekExercise;
+          }
+        }
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        appData = data;
+        viewingWeekOffset = 0;
+        syncToCloud();
+        render();
+        showSaveToast();
+        alert('Data restored successfully!');
+      } else {
+        alert('Invalid backup file format');
+      }
+    } catch (err) {
+      alert('Failed to read backup file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAllData() {
+  if (confirm('Are you sure you want to delete ALL data? This cannot be undone.')) {
+    if (confirm('Really delete everything? Consider exporting a backup first.')) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(BACKUP_KEY);
+      appData = createEmptyData();
+      syncToCloud();
+      render();
+    }
+  }
+}
+
+function getLastBackupText() {
+  const lastBackup = localStorage.getItem(BACKUP_KEY);
+  if (!lastBackup) return 'Never backed up';
+  
+  const date = new Date(lastBackup);
+  const now = new Date();
+  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Backed up today';
+  if (diffDays === 1) return 'Backed up yesterday';
+  if (diffDays < 7) return `Backed up ${diffDays} days ago`;
+  return `Backed up ${date.toLocaleDateString()}`;
+}
+
+// App State
+let appData = createEmptyData();
+let currentView = 'auth';
+let selectedArea = null;
+let reviewingMonth = null;
+
+// =====================================================
+// AUTHENTICATION
+// =====================================================
+function renderAuth() {
+  return `
+    <div class="auth-screen">
+      <div class="auth-logo">🎯</div>
+      <h1 class="auth-title">Goal Tracker</h1>
+      <p class="auth-subtitle">Sign in to sync your goals across devices</p>
+      <button class="auth-btn" id="googleSignIn">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+        Sign in with Google
+      </button>
+      <p class="auth-error" id="authError"></p>
+    </div>
+  `;
+}
+
+function attachAuthEvents() {
+  document.getElementById('googleSignIn').addEventListener('click', async () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+      await auth.signInWithPopup(provider);
+    } catch (error) {
+      document.getElementById('authError').textContent = error.message;
+    }
+  });
+}
+
+// Auth state listener
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUser = user;
+    userDataRef = database.ref(`users/${user.uid}/data`);
+    
+    // Load data from cloud
+    const snapshot = await userDataRef.once('value');
+    const cloudData = snapshot.val();
+    
+    if (cloudData) {
+      // Merge with local if needed
+      appData = cloudData;
+      if (!appData.areas.life) {
+        appData.areas.life = { months: {} };
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+    } else {
+      // Use local data and sync to cloud
+      appData = getInitialData();
+      syncToCloud();
+    }
+    
+    // Listen for changes from other devices
+    userDataRef.on('value', (snapshot) => {
+      const newData = snapshot.val();
+      if (newData) {
+        appData = newData;
+        if (!appData.areas.life) {
+          appData.areas.life = { months: {} };
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        if (currentView !== 'auth') {
+          render();
+        }
+      }
+    });
+    
+    currentView = 'summary';
+    render();
+    startSessionTimer();
+  } else {
+    currentUser = null;
+    userDataRef = null;
+    currentView = 'auth';
+    render();
+  }
+});
+
+function signOut() {
+  auth.signOut();
+}
+
+// =====================================================
+// RENDER FUNCTIONS
+// =====================================================
+function render() {
+  const app = document.getElementById('app');
+  
+  if (currentView === 'auth') {
+    app.innerHTML = renderAuth();
+    attachAuthEvents();
+  } else if (currentView === 'summary') {
+    app.innerHTML = renderSummary();
+    attachSummaryEvents();
+  } else if (currentView === 'monthly') {
+    app.innerHTML = renderMonthly();
+    attachMonthlyEvents();
+  } else if (currentView === 'yearly') {
+    app.innerHTML = renderYearly();
+    attachYearlyEvents();
+  } else if (currentView === 'learnings') {
+    app.innerHTML = renderLearnings();
+    attachLearningsEvents();
+  } else if (currentView === 'monthReview') {
+    app.innerHTML = renderMonthReview();
+    attachMonthReviewEvents();
+  }
+}
+
+function renderSummary() {
+  const month = appData.currentMonth;
+  const weekKey = getWeekKey(viewingWeekOffset);
+  const exercise = getExerciseForWeek(weekKey);
+  const strengthCount = exercise.strength.filter(Boolean).length;
+  const zone2Percent = Math.min(100, (exercise.zone2Mins / 30) * 100);
+  const meditationPercent = Math.min(100, (exercise.meditationMins / 20) * 100);
+  const weekday = getWeekdayName();
+  const fullDate = getFullDate();
+  const elapsed = Date.now() - sessionStartTime;
+  const nudges = isCurrentWeek(viewingWeekOffset) ? getNudges(exercise) : [];
+  const weekLabel = getWeekLabel(viewingWeekOffset);
+  const isViewingPast = viewingWeekOffset < 0;
+  const lastWeekData = getLastWeekExercise();
+  
+  let areasHtml = '';
+  
+  Object.entries(FOCUS_AREAS).forEach(([key, area]) => {
+    if (key === 'exercise' || key === 'life') return;
+    
+    const monthData = appData.areas[key]?.months[month] || {};
+    const goal1 = monthData.goal1 || {};
+    const goal2 = monthData.goal2 || {};
+    
+    const status1 = getGoalStatus(goal1);
+    const status2 = getGoalStatus(goal2);
+    const count1 = getTaskCount(goal1);
+    const count2 = getTaskCount(goal2);
+    
+    areasHtml += `
+      <div class="area-card" data-area="${key}" style="--accent: ${area.color}">
+        <div class="area-header">
+          <span class="area-icon">${area.icon}</span>
+          <span class="area-name">${area.name}</span>
+        </div>
+        <div class="goal-row">
+          <span class="status-dot ${status1}"></span>
+          <span class="goal-text ${goal1.text ? '' : 'empty'}">${goal1.text || 'Goal 1 not set'}</span>
+          ${count1.total > 0 ? `<span class="task-progress">${count1.done}/${count1.total}</span>` : ''}
+        </div>
+        <div class="goal-row">
+          <span class="status-dot ${status2}"></span>
+          <span class="goal-text ${goal2.text ? '' : 'empty'}">${goal2.text || 'Goal 2 not set'}</span>
+          ${count2.total > 0 ? `<span class="task-progress">${count2.done}/${count2.total}</span>` : ''}
+        </div>
+      </div>
+    `;
+  });
+  
+  const exerciseMonth = appData.areas.exercise?.months[month] || {};
+  const exGoal1 = exerciseMonth.goal1 || {};
+  const exGoal2 = exerciseMonth.goal2 || {};
+  const exStatus1 = getGoalStatus(exGoal1);
+  const exStatus2 = getGoalStatus(exGoal2);
+  const exCount1 = getTaskCount(exGoal1);
+  const exCount2 = getTaskCount(exGoal2);
+  
+  const lifeMonth = appData.areas.life?.months[month] || {};
+  const lifeGoal1 = lifeMonth.goal1 || {};
+  const lifeGoal2 = lifeMonth.goal2 || {};
+  const lifeStatus1 = getGoalStatus(lifeGoal1);
+  const lifeStatus2 = getGoalStatus(lifeGoal2);
+  const lifeCount1 = getTaskCount(lifeGoal1);
+  const lifeCount2 = getTaskCount(lifeGoal2);
+  
+  let nudgesHtml = '';
+  if (nudges.length > 0) {
+    nudgesHtml = `
+      <div class="nudge-section">
+        ${nudges.map(n => `
+          <div class="nudge-item ${n.type === 'achieved' ? 'achieved' : n.type === 'close' ? 'close' : ''}">
+            <span class="nudge-icon">${n.icon}</span>
+            <span>${n.text}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  
+  const userPhoto = currentUser?.photoURL || '';
+  const userEmail = currentUser?.email || '';
+  
+  return `
+    <div class="header">
+      <h1>Goal Tracker</h1>
+      <div class="sync-status">
+        <span class="sync-dot"></span>
+        <span class="sync-text">Synced</span>
+      </div>
+      <div class="user-menu">
+        <img src="${userPhoto}" alt="User" class="user-avatar" id="userAvatar">
+        <div class="user-dropdown" id="userDropdown">
+          <div class="user-email">${userEmail}</div>
+          <div class="user-dropdown-item" id="signOutBtn">Sign Out</div>
+        </div>
+      </div>
+    </div>
+    <div class="container">
+      <div class="date-banner">
+        <div class="date-info">
+          <span class="date-weekday">${weekday}</span>
+          <span class="date-full">${fullDate}</span>
+        </div>
+        <div class="session-info">
+          <span class="session-label">Session</span>
+          <span class="session-time">${formatSessionTime(elapsed)}</span>
+        </div>
+      </div>
+      
+      <div class="exercise-quick ${isViewingPast ? 'viewing-past-week' : ''}">
+        <div class="week-nav">
+          <button class="week-nav-btn" id="prevWeekBtn" ${viewingWeekOffset <= -2 ? 'disabled' : ''}>←</button>
+          <div>
+            <div class="week-nav-label">${weekLabel}</div>
+            ${isViewingPast ? '<div class="week-nav-sublabel">📅 Viewing past week</div>' : ''}
+          </div>
+          <button class="week-nav-btn" id="nextWeekBtn" ${viewingWeekOffset >= 0 ? 'disabled' : ''}>→</button>
+        </div>
+        <div class="exercise-row">
+          <span class="exercise-label">Strength</span>
+          <div class="strength-checks">
+            <button class="check-btn ${exercise.strength[0] ? 'checked' : ''}" data-strength="0">${exercise.strength[0] ? '✓' : ''}</button>
+            <button class="check-btn ${exercise.strength[1] ? 'checked' : ''}" data-strength="1">${exercise.strength[1] ? '✓' : ''}</button>
+            <button class="check-btn ${exercise.strength[2] ? 'checked' : ''}" data-strength="2">${exercise.strength[2] ? '✓' : ''}</button>
+          </div>
+          <span class="exercise-count">${strengthCount}/3</span>
+        </div>
+        <div class="exercise-row">
+          <span class="exercise-label">Zone 2</span>
+          <div class="zone2-controls">
+            <button data-zone2="-5">−</button>
+            <span class="zone2-value">${exercise.zone2Mins} min</span>
+            <button data-zone2="5">+</button>
+          </div>
+          <div class="zone2-bar">
+            <div class="zone2-fill" style="width: ${zone2Percent}%"></div>
+          </div>
+        </div>
+        <div class="exercise-row">
+          <span class="exercise-label">Meditate</span>
+          <div class="zone2-controls">
+            <button data-meditation="-5">−</button>
+            <span class="zone2-value">${exercise.meditationMins} min</span>
+            <button data-meditation="5">+</button>
+          </div>
+          <div class="zone2-bar">
+            <div class="meditation-fill" style="width: ${meditationPercent}%"></div>
+          </div>
+        </div>
+        ${nudgesHtml}
+        ${isCurrentWeek(viewingWeekOffset) ? renderLastWeekSummary(lastWeekData) : ''}
+      </div>
+      
+      ${areasHtml}
+      
+      <div class="area-card" data-area="exercise" style="--accent: #6B3B3B">
+        <div class="area-header">
+          <span class="area-icon">💪</span>
+          <span class="area-name">Exercise</span>
+        </div>
+        <div class="goal-row">
+          <span class="status-dot ${exStatus1}"></span>
+          <span class="goal-text ${exGoal1.text ? '' : 'empty'}">${exGoal1.text || 'Goal 1 not set'}</span>
+          ${exCount1.total > 0 ? `<span class="task-progress">${exCount1.done}/${exCount1.total}</span>` : ''}
+        </div>
+        <div class="goal-row">
+          <span class="status-dot ${exStatus2}"></span>
+          <span class="goal-text ${exGoal2.text ? '' : 'empty'}">${exGoal2.text || 'Goal 2 not set'}</span>
+          ${exCount2.total > 0 ? `<span class="task-progress">${exCount2.done}/${exCount2.total}</span>` : ''}
+        </div>
+      </div>
+      
+      <div class="area-card" data-area="life" style="--accent: #1E6091">
+        <div class="area-header">
+          <span class="area-icon">🏠</span>
+          <span class="area-name">Life Maintenance</span>
+        </div>
+        <div class="goal-row">
+          <span class="status-dot ${lifeStatus1}"></span>
+          <span class="goal-text ${lifeGoal1.text ? '' : 'empty'}">${lifeGoal1.text || 'Goal 1 not set'}</span>
+          ${lifeCount1.total > 0 ? `<span class="task-progress">${lifeCount1.done}/${lifeCount1.total}</span>` : ''}
+        </div>
+        <div class="goal-row">
+          <span class="status-dot ${lifeStatus2}"></span>
+          <span class="goal-text ${lifeGoal2.text ? '' : 'empty'}">${lifeGoal2.text || 'Goal 2 not set'}</span>
+          ${lifeCount2.total > 0 ? `<span class="task-progress">${lifeCount2.done}/${lifeCount2.total}</span>` : ''}
+        </div>
+      </div>
+      
+      <div class="settings-section">
+        <div class="settings-title">💾 Data & Backup</div>
+        <div class="settings-row">
+          <button class="settings-btn" id="exportBtn">📤 Export Backup</button>
+          <button class="settings-btn" id="importBtn">📥 Import Backup</button>
+        </div>
+        <div class="settings-row">
+          <button class="settings-btn danger" id="clearBtn">🗑️ Clear All Data</button>
+        </div>
+        <div class="last-backup">${getLastBackupText()}</div>
+      </div>
+      
+      <button class="yearly-btn" id="yearlyBtn">View Yearly Progress →</button>
+      <button class="learnings-view-btn" id="learningsBtn">📝 View All Learnings →</button>
+    </div>
+  `;
+}
+
+function renderMonthly() {
+  const area = FOCUS_AREAS[selectedArea];
+  const month = appData.currentMonth;
+  const monthData = appData.areas[selectedArea]?.months[month] || { goal1: {}, goal2: {} };
+  const currentWeek = getCurrentWeekNumber();
+  
+  function renderGoalSection(goalKey, goalNum) {
+    const goal = monthData[goalKey] || {};
+    const weeks = [1, 2, 3, 4, 5];
+    
+    let weeksHtml = '';
+    weeks.forEach(weekNum => {
+      const weekIndex = weekNum - 1;
+      const weekData = (goal.weeks || [])[weekIndex] || { tasks: [] };
+      const tasks = weekData.tasks || [];
+      const isCurrent = weekNum === currentWeek;
+      const doneCount = tasks.filter(t => t.done).length;
+      const undoneCount = tasks.length - doneCount;
+      
+      let canAddTask, maxTasksNote;
+      if (selectedArea === 'life') {
+        canAddTask = tasks.length < 4 && undoneCount < 2;
+        if (tasks.length >= 4) {
+          maxTasksNote = 'Maximum 4 tasks per week';
+        } else if (undoneCount >= 2) {
+          maxTasksNote = 'Complete a task to add more (max 2 undone)';
+        } else {
+          maxTasksNote = '';
+        }
+      } else {
+        canAddTask = tasks.length < 3;
+        maxTasksNote = tasks.length >= 3 ? 'Maximum 3 tasks per week' : '';
+      }
+      
+      let tasksHtml = tasks.map((task, taskIndex) => `
+        <div class="task-item">
+          <button class="task-check ${task.done ? 'done' : ''}" 
+                  data-goal="${goalKey}" data-week="${weekIndex}" data-task="${taskIndex}">
+            ${task.done ? '✓' : ''}
+          </button>
+          <span class="task-text ${task.done ? 'done' : ''}" 
+                data-goal="${goalKey}" data-week="${weekIndex}" data-task="${taskIndex}">${task.text}</span>
+          <button class="task-delete" data-goal="${goalKey}" data-week="${weekIndex}" data-task="${taskIndex}">×</button>
+        </div>
+      `).join('');
+      
+      weeksHtml += `
+        <div class="week-section">
+          <div class="week-header">
+            <span class="week-label">Week ${weekNum}</span>
+            ${isCurrent ? '<span class="current-badge">Current</span>' : ''}
+            ${tasks.length > 0 ? `<span class="week-status">${doneCount}/${tasks.length}</span>` : ''}
+          </div>
+          ${tasksHtml}
+          <div class="add-task-row">
+            <input type="text" class="add-task-input" 
+                   data-goal="${goalKey}" data-week="${weekIndex}"
+                   placeholder="${canAddTask ? 'Add task...' : (selectedArea === 'life' ? 'Complete a task first' : 'Max 3 tasks')}"
+                   ${canAddTask ? '' : 'disabled'}>
+            <button class="add-task-btn" 
+                    data-goal="${goalKey}" data-week="${weekIndex}"
+                    ${canAddTask ? '' : 'disabled'}>+</button>
+          </div>
+          ${maxTasksNote ? `<div class="max-tasks-note">${maxTasksNote}</div>` : ''}
+          
+          <div class="learnings-section">
+            <div class="learnings-header">
+              <span class="learnings-label">💡 Learnings</span>
+              ${weekData.learnings?.length ? `<span class="learnings-count">${weekData.learnings.length}</span>` : ''}
+            </div>
+            ${(weekData.learnings || []).map((learning, learningIndex) => `
+              <div class="learning-item">
+                <span class="learning-bullet">•</span>
+                <span class="learning-text" data-goal="${goalKey}" data-week="${weekIndex}" data-learning="${learningIndex}">${learning.text}</span>
+                <button class="learning-delete" data-goal="${goalKey}" data-week="${weekIndex}" data-learning="${learningIndex}">×</button>
+              </div>
+            `).join('')}
+            <div class="add-learning-row">
+              <input type="text" class="add-learning-input" 
+                     data-goal="${goalKey}" data-week="${weekIndex}"
+                     placeholder="Add learning...">
+              <button class="add-learning-btn" data-goal="${goalKey}" data-week="${weekIndex}">+</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    
+    return `
+      <div class="monthly-goal-section" style="--accent: ${area.color}">
+        <div class="goal-number">Goal ${goalNum}</div>
+        <div class="goal-input-row">
+          <input type="text" class="goal-input" 
+                 data-goal="${goalKey}"
+                 placeholder="What's your goal?"
+                 value="${goal.text || ''}">
+        </div>
+        ${weeksHtml}
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="header">
+      <button class="back-btn" id="backBtn">← Back</button>
+      <h1>${area.icon} ${area.name}</h1>
+      <span class="current-month">${getMonthName(month)}</span>
+    </div>
+    <div class="container">
+      <div class="date-banner">
+        <div class="date-info">
+          <span class="date-weekday">${getWeekdayName()}</span>
+          <span class="date-full">${getFullDate()}</span>
+        </div>
+        <div class="session-info">
+          <span class="session-label">Session</span>
+          <span class="session-time">${formatSessionTime(Date.now() - sessionStartTime)}</span>
+        </div>
+      </div>
+      ${renderGoalSection('goal1', 1)}
+      ${renderGoalSection('goal2', 2)}
+    </div>
+  `;
+}
+
+function renderYearly() {
+  const currentYear = new Date().getFullYear();
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const m = String(i + 1).padStart(2, '0');
+    return `${currentYear}-${m}`;
+  });
+  
+  const areaKeys = Object.keys(FOCUS_AREAS);
+  
+  let headerCells = areaKeys.map(key => 
+    `<span class="area-col">${FOCUS_AREAS[key].icon}</span>`
+  ).join('');
+  
+  let rows = months.map(monthStr => {
+    const isCurrent = monthStr === appData.currentMonth;
+    
+    let cells = areaKeys.map(key => {
+      const monthData = appData.areas[key]?.months[monthStr] || {};
+      const status1 = getGoalStatus(monthData.goal1);
+      const status2 = getGoalStatus(monthData.goal2);
+      return `
+        <span class="status-cell">
+          <span class="mini-dot ${status1}"></span>
+          <span class="mini-dot ${status2}"></span>
+        </span>
+      `;
+    }).join('');
+    
+    return `
+      <div class="grid-row ${isCurrent ? 'current' : ''}" data-month="${monthStr}">
+        <span class="month-col">${getShortMonthName(monthStr)}</span>
+        ${cells}
+      </div>
+    `;
+  }).join('');
+  
+  return `
+    <div class="header">
+      <button class="back-btn" id="backBtn">← Back</button>
+      <h1>${currentYear} Overview</h1>
+    </div>
+    <div class="container">
+      <div class="date-banner">
+        <div class="date-info">
+          <span class="date-weekday">${getWeekdayName()}</span>
+          <span class="date-full">${getFullDate()}</span>
+        </div>
+        <div class="session-info">
+          <span class="session-label">Session</span>
+          <span class="session-time">${formatSessionTime(Date.now() - sessionStartTime)}</span>
+        </div>
+      </div>
+      <div class="yearly-grid">
+        <div class="grid-header">
+          <span class="month-col">Month</span>
+          ${headerCells}
+        </div>
+        ${rows}
+      </div>
+      <div class="legend">
+        <span><span class="dot green" style="background:#22C55E"></span> Done</span>
+        <span><span class="dot amber" style="background:#F59E0B"></span> In Progress</span>
+        <span><span class="dot red" style="background:#DC2626"></span> Not Started</span>
+        <span><span class="dot empty" style="background:#E5E2DC"></span> No Goal</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderLearnings() {
+  const currentYear = new Date().getFullYear();
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const m = String(i + 1).padStart(2, '0');
+    return `${currentYear}-${m}`;
+  }).reverse();
+  
+  let hasAnyLearnings = false;
+  let monthsHtml = '';
+  
+  months.forEach(monthStr => {
+    let monthHasLearnings = false;
+    let goalsHtml = '';
+    
+    Object.entries(FOCUS_AREAS).forEach(([areaKey, area]) => {
+      const monthData = appData.areas[areaKey]?.months[monthStr];
+      if (!monthData) return;
+      
+      ['goal1', 'goal2'].forEach((goalKey, goalIndex) => {
+        const goal = monthData[goalKey];
+        if (!goal || !goal.text) return;
+        
+        let weeksHtml = '';
+        (goal.weeks || []).forEach((week, weekIndex) => {
+          if (week.learnings && week.learnings.length > 0) {
+            monthHasLearnings = true;
+            hasAnyLearnings = true;
+            
+            weeksHtml += `
+              <div class="learnings-week-group">
+                <div class="learnings-week-label">Week ${weekIndex + 1}</div>
+                ${week.learnings.map(l => `
+                  <div class="learnings-week-item">${l.text}</div>
+                `).join('')}
+              </div>
+            `;
+          }
+        });
+        
+        if (weeksHtml) {
+          goalsHtml += `
+            <div class="learnings-goal-group">
+              <div class="learnings-goal-title">
+                <span class="learnings-goal-icon" style="background: ${area.color}"></span>
+                ${area.icon} ${goal.text}
+              </div>
+              ${weeksHtml}
+            </div>
+          `;
+        }
+      });
+    });
+    
+    if (monthHasLearnings) {
+      const monthName = getMonthName(monthStr);
+      monthsHtml += `
+        <div class="learnings-month-group">
+          <div class="learnings-month-header" data-month="${monthStr}">
+            <span>${monthName}</span>
+            <span class="learnings-month-arrow">Go to month →</span>
+          </div>
+          ${goalsHtml}
+        </div>
+      `;
+    }
+  });
+  
+  const contentHtml = hasAnyLearnings 
+    ? monthsHtml 
+    : '<div class="no-learnings">No learnings captured yet.<br>Add learnings under weekly tasks in your goals.</div>';
+  
+  return `
+    <div class="header">
+      <button class="back-btn" id="backBtn">← Back</button>
+      <h1>📝 Learnings</h1>
+    </div>
+    <div class="container">
+      <div class="date-banner">
+        <div class="date-info">
+          <span class="date-weekday">${getWeekdayName()}</span>
+          <span class="date-full">${getFullDate()}</span>
+        </div>
+        <div class="session-info">
+          <span class="session-label">Session</span>
+          <span class="session-time">${formatSessionTime(Date.now() - sessionStartTime)}</span>
+        </div>
+      </div>
+      ${contentHtml}
+    </div>
+  `;
+}
+
+function renderMonthReview() {
+  const month = reviewingMonth;
+  const monthName = getMonthName(month);
+  
+  let areasHtml = '';
+  
+  Object.entries(FOCUS_AREAS).forEach(([areaKey, area]) => {
+    const monthData = appData.areas[areaKey]?.months[month] || {};
+    
+    let goalsHtml = '';
+    ['goal1', 'goal2'].forEach((goalKey, goalIndex) => {
+      const goal = monthData[goalKey] || {};
+      const goalText = goal.text || `Goal ${goalIndex + 1} not set`;
+      const hasGoal = !!goal.text;
+      
+      let weeksHtml = '';
+      [1, 2, 3, 4, 5].forEach(weekNum => {
+        const weekIndex = weekNum - 1;
+        const weekData = (goal.weeks || [])[weekIndex] || { tasks: [], learnings: [] };
+        const tasks = weekData.tasks || [];
+        const learnings = weekData.learnings || [];
+        
+        let tasksHtml = '';
+        if (tasks.length > 0) {
+          tasksHtml = tasks.map(task => `
+            <div class="month-review-task ${task.done ? 'done' : ''}">
+              <span class="month-review-task-check">${task.done ? '✓' : ''}</span>
+              <span>${task.text}</span>
+            </div>
+          `).join('');
+        } else {
+          tasksHtml = '<div class="month-review-no-tasks">No tasks</div>';
+        }
+        
+        let learningsHtml = (learnings || []).map((learning, learningIndex) => `
+          <div class="learning-item">
+            <span class="learning-bullet">•</span>
+            <span class="learning-text" data-area="${areaKey}" data-goal="${goalKey}" data-week="${weekIndex}" data-learning="${learningIndex}">${learning.text}</span>
+            <button class="learning-delete" data-area="${areaKey}" data-goal="${goalKey}" data-week="${weekIndex}" data-learning="${learningIndex}">×</button>
+          </div>
+        `).join('');
+        
+        weeksHtml += `
+          <div class="month-review-week">
+            <div class="month-review-week-label">Week ${weekNum}</div>
+            ${tasksHtml}
+            <div class="learnings-section" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #E5E2DC;">
+              <div class="learnings-header">
+                <span class="learnings-label">💡 Learnings</span>
+                ${learnings.length ? `<span class="learnings-count">${learnings.length}</span>` : ''}
+              </div>
+              ${learningsHtml}
+              <div class="add-learning-row">
+                <input type="text" class="add-learning-input" 
+                       data-area="${areaKey}" data-goal="${goalKey}" data-week="${weekIndex}"
+                       placeholder="Add learning...">
+                <button class="add-learning-btn" data-area="${areaKey}" data-goal="${goalKey}" data-week="${weekIndex}">+</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      goalsHtml += `
+        <div class="month-review-goal">
+          <div class="month-review-goal-title ${hasGoal ? '' : 'empty'}">${goalText}</div>
+          ${weeksHtml}
+        </div>
+      `;
+    });
+    
+    areasHtml += `
+      <div class="month-review-area" style="--accent: ${area.color}">
+        <div class="month-review-header">
+          <span class="area-icon">${area.icon}</span>
+          <span class="area-name">${area.name}</span>
+        </div>
+        ${goalsHtml}
+      </div>
+    `;
+  });
+  
+  return `
+    <div class="header">
+      <button class="back-btn" id="backBtn">← Back</button>
+      <h1>📅 ${monthName}</h1>
+    </div>
+    <div class="container">
+      <div class="date-banner">
+        <div class="date-info">
+          <span class="date-weekday">${getWeekdayName()}</span>
+          <span class="date-full">${getFullDate()}</span>
+        </div>
+        <div class="session-info">
+          <span class="session-label">Session</span>
+          <span class="session-time">${formatSessionTime(Date.now() - sessionStartTime)}</span>
+        </div>
+      </div>
+      ${areasHtml}
+    </div>
+  `;
+}
+
+// =====================================================
+// EVENT HANDLERS
+// =====================================================
+function attachSummaryEvents() {
+  const weekKey = getWeekKey(viewingWeekOffset);
+  
+  // User dropdown
+  document.getElementById('userAvatar').addEventListener('click', () => {
+    document.getElementById('userDropdown').classList.toggle('show');
+  });
+  
+  document.getElementById('signOutBtn').addEventListener('click', signOut);
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.user-menu')) {
+      document.getElementById('userDropdown')?.classList.remove('show');
+    }
+  });
+  
+  // Area cards
+  document.querySelectorAll('.area-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.check-btn') || e.target.closest('[data-zone2]') || e.target.closest('[data-meditation]')) return;
+      selectedArea = card.dataset.area;
+      currentView = 'monthly';
+      render();
+    });
+  });
+  
+  // Week navigation
+  document.getElementById('prevWeekBtn').addEventListener('click', () => {
+    if (viewingWeekOffset > -2) {
+      viewingWeekOffset--;
+      render();
+    }
+  });
+  
+  document.getElementById('nextWeekBtn').addEventListener('click', () => {
+    if (viewingWeekOffset < 0) {
+      viewingWeekOffset++;
+      render();
+    }
+  });
+  
+  // Strength checkboxes
+  document.querySelectorAll('[data-strength]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.strength);
+      const exercise = getExerciseForWeek(weekKey);
+      exercise.strength[idx] = !exercise.strength[idx];
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Zone 2 buttons
+  document.querySelectorAll('[data-zone2]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const delta = parseInt(btn.dataset.zone2);
+      const exercise = getExerciseForWeek(weekKey);
+      exercise.zone2Mins = Math.max(0, exercise.zone2Mins + delta);
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Meditation buttons
+  document.querySelectorAll('[data-meditation]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const delta = parseInt(btn.dataset.meditation);
+      const exercise = getExerciseForWeek(weekKey);
+      exercise.meditationMins = Math.max(0, exercise.meditationMins + delta);
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Yearly button
+  document.getElementById('yearlyBtn').addEventListener('click', () => {
+    currentView = 'yearly';
+    render();
+  });
+  
+  // Learnings button
+  document.getElementById('learningsBtn').addEventListener('click', () => {
+    currentView = 'learnings';
+    render();
+  });
+  
+  // Backup buttons
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importInput').click();
+  });
+  document.getElementById('clearBtn').addEventListener('click', clearAllData);
+  
+  // Import handler
+  document.getElementById('importInput').addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      importData(e.target.files[0]);
+      e.target.value = '';
+    }
+  });
+  
+  updateSyncStatus(isOnline ? 'synced' : 'offline');
+}
+
+function attachMonthlyEvents() {
+  const month = appData.currentMonth;
+  
+  document.getElementById('backBtn').addEventListener('click', () => {
+    viewingWeekOffset = 0;
+    currentView = 'summary';
+    render();
+  });
+  
+  // Goal inputs
+  document.querySelectorAll('.goal-input').forEach(input => {
+    input.addEventListener('change', () => {
+      const goalKey = input.dataset.goal;
+      ensureMonthData(selectedArea, month);
+      if (!appData.areas[selectedArea].months[month][goalKey]) {
+        appData.areas[selectedArea].months[month][goalKey] = { text: '', weeks: [] };
+      }
+      appData.areas[selectedArea].months[month][goalKey].text = input.value;
+      saveData(appData);
+    });
+  });
+  
+  // Task checkboxes
+  document.querySelectorAll('.task-check').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { goal, week, task } = btn.dataset;
+      const weekIdx = parseInt(week);
+      const taskIdx = parseInt(task);
+      
+      appData.areas[selectedArea].months[month][goal].weeks[weekIdx].tasks[taskIdx].done = 
+        !appData.areas[selectedArea].months[month][goal].weeks[weekIdx].tasks[taskIdx].done;
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Task delete
+  document.querySelectorAll('.task-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { goal, week, task } = btn.dataset;
+      const weekIdx = parseInt(week);
+      const taskIdx = parseInt(task);
+      
+      appData.areas[selectedArea].months[month][goal].weeks[weekIdx].tasks.splice(taskIdx, 1);
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Task edit
+  document.querySelectorAll('.task-text').forEach(span => {
+    span.addEventListener('click', (e) => {
+      const { goal, week, task } = span.dataset;
+      const weekIdx = parseInt(week);
+      const taskIdx = parseInt(task);
+      const currentText = appData.areas[selectedArea].months[month][goal].weeks[weekIdx].tasks[taskIdx].text;
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'task-edit-input';
+      input.value = currentText;
+      
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+      
+      const saveEdit = () => {
+        const newText = input.value.trim();
+        if (newText && newText !== currentText) {
+          appData.areas[selectedArea].months[month][goal].weeks[weekIdx].tasks[taskIdx].text = newText;
+          saveData(appData);
+        }
+        render();
+      };
+      
+      input.addEventListener('blur', saveEdit);
+      input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Escape') render(); });
+    });
+  });
+  
+  // Add task
+  document.querySelectorAll('.add-task-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { goal, week } = btn.dataset;
+      const weekIdx = parseInt(week);
+      const input = document.querySelector(`.add-task-input[data-goal="${goal}"][data-week="${week}"]`);
+      
+      if (!input.value.trim()) return;
+      
+      ensureMonthData(selectedArea, month);
+      if (!appData.areas[selectedArea].months[month][goal]) {
+        appData.areas[selectedArea].months[month][goal] = { text: '', weeks: [] };
+      }
+      
+      while ((appData.areas[selectedArea].months[month][goal].weeks || []).length <= weekIdx) {
+        if (!appData.areas[selectedArea].months[month][goal].weeks) {
+          appData.areas[selectedArea].months[month][goal].weeks = [];
+        }
+        appData.areas[selectedArea].months[month][goal].weeks.push({ tasks: [], learnings: [] });
+      }
+      
+      const tasks = appData.areas[selectedArea].months[month][goal].weeks[weekIdx].tasks;
+      const doneCount = tasks.filter(t => t.done).length;
+      const undoneCount = tasks.length - doneCount;
+      
+      if (selectedArea === 'life') {
+        if (tasks.length >= 4 || undoneCount >= 2) return;
+      } else {
+        if (tasks.length >= 3) return;
+      }
+      
+      tasks.push({ text: input.value.trim(), done: false });
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Enter for tasks
+  document.querySelectorAll('.add-task-input').forEach(input => {
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.querySelector(`.add-task-btn[data-goal="${input.dataset.goal}"][data-week="${input.dataset.week}"]`).click();
+      }
+    });
+  });
+  
+  // Add learning
+  document.querySelectorAll('.add-learning-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { goal, week } = btn.dataset;
+      const weekIdx = parseInt(week);
+      const input = document.querySelector(`.add-learning-input[data-goal="${goal}"][data-week="${week}"]`);
+      
+      if (!input.value.trim()) return;
+      
+      ensureMonthData(selectedArea, month);
+      if (!appData.areas[selectedArea].months[month][goal]) {
+        appData.areas[selectedArea].months[month][goal] = { text: '', weeks: [] };
+      }
+      
+      while ((appData.areas[selectedArea].months[month][goal].weeks || []).length <= weekIdx) {
+        if (!appData.areas[selectedArea].months[month][goal].weeks) {
+          appData.areas[selectedArea].months[month][goal].weeks = [];
+        }
+        appData.areas[selectedArea].months[month][goal].weeks.push({ tasks: [], learnings: [] });
+      }
+      
+      if (!appData.areas[selectedArea].months[month][goal].weeks[weekIdx].learnings) {
+        appData.areas[selectedArea].months[month][goal].weeks[weekIdx].learnings = [];
+      }
+      
+      appData.areas[selectedArea].months[month][goal].weeks[weekIdx].learnings.push({ text: input.value.trim() });
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Enter for learnings
+  document.querySelectorAll('.add-learning-input').forEach(input => {
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.querySelector(`.add-learning-btn[data-goal="${input.dataset.goal}"][data-week="${input.dataset.week}"]`).click();
+      }
+    });
+  });
+  
+  // Learning delete
+  document.querySelectorAll('.learning-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { goal, week, learning } = btn.dataset;
+      appData.areas[selectedArea].months[month][goal].weeks[parseInt(week)].learnings.splice(parseInt(learning), 1);
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Learning edit
+  document.querySelectorAll('.learning-text').forEach(span => {
+    span.addEventListener('click', () => {
+      const { goal, week, learning } = span.dataset;
+      const weekIdx = parseInt(week);
+      const learningIdx = parseInt(learning);
+      const currentText = appData.areas[selectedArea].months[month][goal].weeks[weekIdx].learnings[learningIdx].text;
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'learning-edit-input';
+      input.value = currentText;
+      
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+      
+      const saveEdit = () => {
+        const newText = input.value.trim();
+        if (newText && newText !== currentText) {
+          appData.areas[selectedArea].months[month][goal].weeks[weekIdx].learnings[learningIdx].text = newText;
+          saveData(appData);
+        }
+        render();
+      };
+      
+      input.addEventListener('blur', saveEdit);
+      input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Escape') render(); });
+    });
+  });
+}
+
+function attachYearlyEvents() {
+  document.getElementById('backBtn').addEventListener('click', () => {
+    viewingWeekOffset = 0;
+    currentView = 'summary';
+    render();
+  });
+  
+  document.querySelectorAll('.grid-row').forEach(row => {
+    row.addEventListener('click', () => {
+      reviewingMonth = row.dataset.month;
+      currentView = 'monthReview';
+      render();
+    });
+  });
+}
+
+function attachLearningsEvents() {
+  document.getElementById('backBtn').addEventListener('click', () => {
+    viewingWeekOffset = 0;
+    currentView = 'summary';
+    render();
+  });
+  
+  document.querySelectorAll('.learnings-month-header').forEach(header => {
+    header.addEventListener('click', () => {
+      appData.currentMonth = header.dataset.month;
+      saveData(appData);
+      viewingWeekOffset = 0;
+      currentView = 'summary';
+      render();
+    });
+  });
+}
+
+function attachMonthReviewEvents() {
+  const month = reviewingMonth;
+  
+  document.getElementById('backBtn').addEventListener('click', () => {
+    currentView = 'yearly';
+    render();
+  });
+  
+  // Add learning
+  document.querySelectorAll('.add-learning-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { area, goal, week } = btn.dataset;
+      const weekIdx = parseInt(week);
+      const input = document.querySelector(`.add-learning-input[data-area="${area}"][data-goal="${goal}"][data-week="${week}"]`);
+      
+      if (!input.value.trim()) return;
+      
+      if (!appData.areas[area].months[month]) {
+        appData.areas[area].months[month] = { goal1: { text: '', weeks: [] }, goal2: { text: '', weeks: [] } };
+      }
+      if (!appData.areas[area].months[month][goal]) {
+        appData.areas[area].months[month][goal] = { text: '', weeks: [] };
+      }
+      while ((appData.areas[area].months[month][goal].weeks || []).length <= weekIdx) {
+        if (!appData.areas[area].months[month][goal].weeks) {
+          appData.areas[area].months[month][goal].weeks = [];
+        }
+        appData.areas[area].months[month][goal].weeks.push({ tasks: [], learnings: [] });
+      }
+      if (!appData.areas[area].months[month][goal].weeks[weekIdx].learnings) {
+        appData.areas[area].months[month][goal].weeks[weekIdx].learnings = [];
+      }
+      
+      appData.areas[area].months[month][goal].weeks[weekIdx].learnings.push({ text: input.value.trim() });
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Enter for learnings
+  document.querySelectorAll('.add-learning-input').forEach(input => {
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.querySelector(`.add-learning-btn[data-area="${input.dataset.area}"][data-goal="${input.dataset.goal}"][data-week="${input.dataset.week}"]`).click();
+      }
+    });
+  });
+  
+  // Learning delete
+  document.querySelectorAll('.learning-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { area, goal, week, learning } = btn.dataset;
+      appData.areas[area].months[month][goal].weeks[parseInt(week)].learnings.splice(parseInt(learning), 1);
+      saveData(appData);
+      render();
+    });
+  });
+  
+  // Learning edit
+  document.querySelectorAll('.learning-text').forEach(span => {
+    span.addEventListener('click', () => {
+      const { area, goal, week, learning } = span.dataset;
+      const weekIdx = parseInt(week);
+      const learningIdx = parseInt(learning);
+      const currentText = appData.areas[area].months[month][goal].weeks[weekIdx].learnings[learningIdx].text;
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'learning-edit-input';
+      input.value = currentText;
+      
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+      
+      const saveEdit = () => {
+        const newText = input.value.trim();
+        if (newText && newText !== currentText) {
+          appData.areas[area].months[month][goal].weeks[weekIdx].learnings[learningIdx].text = newText;
+          saveData(appData);
+        }
+        render();
+      };
+      
+      input.addEventListener('blur', saveEdit);
+      input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Escape') render(); });
+    });
+  });
+}
+
+function ensureMonthData(areaKey, month) {
+  if (!appData.areas[areaKey].months[month]) {
+    appData.areas[areaKey].months[month] = {
+      goal1: { text: '', weeks: [] },
+      goal2: { text: '', weeks: [] }
+    };
+  }
+}
+
+// Initial render (will show auth screen until user signs in)
+render();
+</script>
+
+</body>
+</html>
